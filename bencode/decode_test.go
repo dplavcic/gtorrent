@@ -7,6 +7,27 @@ import (
 	"testing"
 )
 
+func TestDictParser(t *testing.T) {
+	testCases := map[string]struct {
+		in  *bytes.Buffer
+		out map[string]interface{}
+	}{
+		"dit":            {bytes.NewBuffer([]byte("d4:name3:fooe")), map[string]interface{}{"name": "foo"}},
+		"dict_with_dict": {bytes.NewBuffer([]byte("d1:a1:b1:cd1:e1:fee")), map[string]interface{}{"a": "b", "c": map[string]interface{}{"e": "f"}}},
+	}
+
+	for name, tt := range testCases {
+		t.Run(name, func(t *testing.T) {
+			result := ReadDict(tt.in)
+			tempResult := fmt.Sprintf("%s", result)
+			tempOut := fmt.Sprint(tt.out)
+			if bytes.Compare([]byte(tempResult), []byte(tempOut)) != 0 {
+				t.Errorf("want: \n%s, got: \n%s\n", tt.out, result)
+			}
+		})
+	}
+}
+
 func TestIntParser(t *testing.T) {
 	testCases := map[string]struct {
 		in  *bytes.Buffer
