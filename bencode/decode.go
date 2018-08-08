@@ -7,7 +7,15 @@ import (
 	"strconv"
 )
 
+// TODO(dplavcic) find better way to calculate announce hash
+// announce hash helper variable
+var originalBuferLength int
+var infoDictStartPosition int
+var infoDictEndPosition int
+var announceURLHash = make([]byte, 160)
+
 func Unmarshall(buf *bytes.Buffer) interface{} {
+	originalBuferLength = buf.Len()
 	return ReadNext(buf)
 }
 
@@ -49,6 +57,9 @@ func ReadDict(buf *bytes.Buffer) map[string]interface{} {
 			log.Fatal(err)
 		}
 		if b == 'e' {
+			if infoDictEndPosition == 0 {
+				infoDictEndPosition = (originalBuferLength - buf.Len())
+			}
 			break
 		} else {
 			buf.UnreadByte() //not end of the dict, unread byte
@@ -107,5 +118,19 @@ func ReadString(buf *bytes.Buffer) string {
 	if int64(n) != strLenValue {
 		log.Fatalf("Could not read all bytes. Expected: %d, got: %d\n", strLenValue, n)
 	}
+
+	// we need this to calculate announce hash
+	if string(buffer) == "info" {
+		infoDictStartPosition = originalBuferLength - buf.Len()
+	}
+
 	return string(buffer)
+}
+
+func InfoDictStartPosition() int {
+	return infoDictStartPosition
+}
+
+func InfoDictEndPosition() int {
+	return infoDictEndPosition
 }
