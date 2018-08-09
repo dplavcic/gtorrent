@@ -2,6 +2,7 @@ package bencode
 
 import (
 	"bytes"
+	"fmt"
 	"io"
 	"log"
 	"strconv"
@@ -25,7 +26,7 @@ func ReadNext(buf *bytes.Buffer) interface{} {
 	if err != nil {
 		log.Fatal(err)
 	}
-
+	fmt.Println("byte: " + string(b))
 	if b == 'd' {
 		buf.UnreadByte()
 		item = ReadDict(buf)

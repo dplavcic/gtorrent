@@ -9,8 +9,12 @@ import (
 
 func main() {
 
-	torrent.ReadTorrentFile("debian.torrent")
-	h := torrent.CalculateAnnounceHash("debian.torrent")
+	t := torrent.ReadTorrentFile("debian.torrent")
+	tr := torrent.MapToStruct(t)
 
-	fmt.Printf("%x\n", h)
+	r := torrent.PingTracker(tr)
+	fmt.Println("response: " + string(r))
+	//	ioutil.WriteFile("debian_compact_mode", r, 066)
+	torrent.ParseTrackerResponse(r)
+
 }
