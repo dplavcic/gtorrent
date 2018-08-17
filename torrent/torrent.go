@@ -5,8 +5,6 @@ import (
 	"io/ioutil"
 	"log"
 	"time"
-
-	"github.com/dplavcic/gtorrent/bencode"
 )
 
 type InfoDictionary struct {
@@ -19,13 +17,14 @@ type InfoDictionary struct {
 }
 
 type TorrentFile struct {
-	Announce     string
+	Announce     string `bencode:"announce"`
 	AnnounceList []string
-	Comment      string
-	CreatedBy    string
-	CreationDate time.Time
-	Encoding     string
+	Comment      string         `bencode:"comment"`
+	CreatedBy    string         `bencode:"createdBy"`
+	CreationDate time.Time      `bencode:"creation date"`
+	Encoding     string         `bencode:"encoding"`
 	Info         InfoDictionary // TODO(dplavcic) check dir struct
+	InfoBytes    []byte         `bencode:"info"`
 }
 
 func ReadTorrentFile(fileName string) interface{} {
@@ -33,8 +32,10 @@ func ReadTorrentFile(fileName string) interface{} {
 	if err != nil {
 		log.Fatal(err)
 	}
-	buf := bytes.NewBuffer(data)
-	return bencode.Unmarshall(buf)
+	bytes.NewBuffer(data)
+
+	// return bencode.Unmarshall(buf)
+	return nil
 }
 
 func MapToStruct(data interface{}) *TorrentFile {

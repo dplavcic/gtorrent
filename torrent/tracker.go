@@ -1,7 +1,6 @@
 package torrent
 
 import (
-	"bytes"
 	"fmt"
 	"io/ioutil"
 	"log"
@@ -9,8 +8,6 @@ import (
 	"net/url"
 	"os"
 	"strconv"
-
-	"github.com/dplavcic/gtorrent/bencode"
 )
 
 const (
@@ -86,7 +83,7 @@ func PingTracker(t *TorrentFile) []byte {
 }
 
 func ParseTrackerResponse(b []byte) {
-	br := bytes.NewBuffer(b)
-	r := bencode.Unmarshall(br)
-	fmt.Printf("%#v\n\n", r)
+	// br := bytes.NewBuffer(b)
+	// r := bencode.Unmarshall(br)
+	fmt.Printf("%#v\n\n", nil)
 }
