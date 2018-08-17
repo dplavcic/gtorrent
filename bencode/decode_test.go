@@ -3,91 +3,97 @@ package bencode
 import (
 	"bytes"
 	"fmt"
-	"math"
+	"reflect"
 	"testing"
 )
 
-func TestDictParser(t *testing.T) {
-	testCases := map[string]struct {
-		in  *bytes.Buffer
-		out map[string]interface{}
-	}{
-		"dit":            {bytes.NewBuffer([]byte("d4:name3:fooe")), map[string]interface{}{"name": "foo"}},
-		"dict_with_dict": {bytes.NewBuffer([]byte("d1:a1:b1:cd1:e1:fee")), map[string]interface{}{"a": "b", "c": map[string]interface{}{"e": "f"}}},
-	}
+func TestParseInt(t *testing.T) {
+	var v int64
+	data := []byte("2e")
 
-	for name, tt := range testCases {
-		t.Run(name, func(t *testing.T) {
-			result := ReadDict(tt.in)
-			tempResult := fmt.Sprintf("%s", result)
-			tempOut := fmt.Sprint(tt.out)
-			if bytes.Compare([]byte(tempResult), []byte(tempOut)) != 0 {
-				t.Errorf("want: \n%s, got: \n%s\n", tt.out, result)
-			}
-		})
+	// reflect.ValueOf(v)  - not addressable
+	// reflect.ValueOf(&x).Elem().Set()
+
+	pv := reflect.ValueOf(&v)
+	e := Decoder{buf: bytes.NewBuffer(data), v: v}
+	e.readInt(pv.Elem())
+	if 2 != v {
+		t.Errorf("expected: %v, got %v", 2, v)
 	}
 }
 
-func TestIntParser(t *testing.T) {
-	testCases := map[string]struct {
-		in  *bytes.Buffer
-		out int64
-	}{
-		"0":          {bytes.NewBuffer([]byte("i0e")), 0},
-		"100":        {bytes.NewBuffer([]byte("i100e")), 100},
-		"-100":       {bytes.NewBuffer([]byte("i-100e")), -100},
-		"2147483647": {bytes.NewBuffer([]byte("i2147483647e")), math.MaxInt32},
-	}
+func TestParseString(t *testing.T) {
+	var s string
+	data := []byte("3:foo")
 
-	for name, tt := range testCases {
-		t.Run(name, func(t *testing.T) {
-			result := ReadInt(tt.in)
-			if result != tt.out {
-				t.Errorf("want: %d, got: %d\n", tt.out, result)
-			}
-		})
+	pv := reflect.ValueOf(&s)
+	e := Decoder{buf: bytes.NewBuffer(data), v: s}
+	e.readString(pv.Elem())
+	if "foo" != s {
+		t.Errorf("expected: %v, got %v", "foo", s)
 	}
 }
 
-func TestStringParser(t *testing.T) {
-	testCases := map[string]struct {
-		in  *bytes.Buffer
-		out string
-	}{
-		"1:f":      {bytes.NewBuffer([]byte("1:f")), "f"},
-		"2:fo":     {bytes.NewBuffer([]byte("2:fo")), "fo"},
-		"6:f1o2o3": {bytes.NewBuffer([]byte("6:f1o2o3")), "f1o2o3"},
-	}
+func TestParseList(t *testing.T) {
+	var l []interface{}
 
-	for name, tt := range testCases {
-		t.Run(name, func(t *testing.T) {
-			result := ReadString(tt.in)
-			if result != tt.out {
-				t.Errorf("want: %s, got: %s\n", tt.out, result)
-			}
-		})
+	fmt.Printf("L with: %v\n", l)
+	fmt.Printf("L with valueOf(): %v\n", reflect.ValueOf(l))
+	fmt.Printf("L with type: %v\n", reflect.TypeOf(l))
+	fmt.Printf("L with kind: %v\n", reflect.ValueOf(l).Kind())
+	// l = make([]interface{}, 1, 1)
+	// l[0] = "hello"
+	data := []byte("3:fool3:barl3:dvae3:bazl1:ale1:bee4:tttte")
+	// data := []byte("3:fooe")
+
+	pv := reflect.ValueOf(&l)
+	e := Decoder{buf: bytes.NewBuffer(data), v: l}
+	e.readList(pv)
+	t.Errorf("Result: %v\n", l)
+}
+
+type Person struct {
+	Id    int8
+	Name  P2
+	First []byte
+	Last  []interface{}
+}
+type P2 struct {
+	Id    int
+	Phone P3
+}
+
+type P3 struct {
+	Country string
+	Phone   string
+}
+
+func TestParseDict(t *testing.T) {
+	p := Person{}
+
+	data := []byte("2:Idi10e5:First3:foo4:Lastli1ei2ee4:Named2:Idi5e5:Phoned7:Country2:hr5:Phone3:385eee")
+	pv := reflect.ValueOf(&p)
+	e := Decoder{buf: bytes.NewBuffer(data), v: p}
+	e.readDict(pv)
+	t.Errorf("Result: %v\n", p)
+}
+
+func BenchmarkList(b *testing.B) {
+	data := []byte("2:Idi10e5:First3:foo4:Lastli1ei2ee4:Named2:Idi5e5:Phoned7:Country2:hr5:Phone3:385eee")
+
+	for n := 0; n < 10000; n++ {
+		p := Person{}
+
+		pv := reflect.ValueOf(&p)
+		e := Decoder{buf: bytes.NewBuffer(data), v: p}
+		e.readDict(pv)
 	}
 }
 
-func TestListParser(t *testing.T) {
-	testCases := map[string]struct {
-		in  *bytes.Buffer
-		out []interface{}
-	}{
-		"[[elem1]]":                {bytes.NewBuffer([]byte("ll3:fooee")), []interface{}{[]interface{}{"foo"}}},
-		"[[elem1][elem2]]":         {bytes.NewBuffer([]byte("ll3:fooel3:baree")), []interface{}{[]interface{}{"foo"}, []interface{}{"bar"}}},
-		"[[elem1, elem2] [elem3]]": {bytes.NewBuffer([]byte("ll3:foo3:barel3:bazee")), []interface{}{[]interface{}{"foo", "bar"}, []interface{}{"baz"}}},
-	}
+// BenchmarkList-8   	       1	1594964541 ns/op	41136712 B/op	 2210069 allocs/op
+// PASS
+// ok  	github.com/dplavcic/gtorrent/bencode	1.597s
 
-	for name, tt := range testCases {
-		t.Run(name, func(t *testing.T) {
-			result := ReadList(tt.in)
-			tempResult := fmt.Sprintf("%s", result)
-			tempOut := fmt.Sprint(tt.out)
-
-			if bytes.Compare([]byte(tempResult), []byte(tempOut)) != 0 {
-				t.Errorf("want: \n%s, got: \n%s\n", tt.out, result)
-			}
-		})
-	}
-}
+// BenchmarkList-8         2000000000               0.02 ns/op            0 B/op          0 allocs/op
+// PASS
+// ok      github.com/dplavcic/gtorrent/bencode    0.249s

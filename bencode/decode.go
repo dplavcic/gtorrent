@@ -5,127 +5,231 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"reflect"
 	"strconv"
 )
 
 // TODO(dplavcic) find better way to calculate announce hash
 // announce hash helper variable
+//do not uomarshal bztes at this step..
+// /unmarshal later, save šđbzte to
 var originalBuferLength int
 var infoDictStartPosition int
 var infoDictEndPosition int
 var announceURLHash = make([]byte, 160)
 
-func Unmarshall(buf *bytes.Buffer) interface{} {
-	originalBuferLength = buf.Len()
-	return ReadNext(buf)
+type Decoder struct {
+	buf *bytes.Buffer
+	v   interface{}
 }
 
-func ReadNext(buf *bytes.Buffer) interface{} {
-	var item interface{}
-	b, err := buf.ReadByte()
-	if err != nil {
-		log.Fatal(err)
+func Unmarshal(data []byte, v interface{}) (err error) {
+	buf := bytes.NewBuffer(data)
+	e := Decoder{buf: buf, v: v}
+	err = e.Decode(v)
+	return err
+}
+
+func (d *Decoder) Decode(v interface{}) error {
+	pv := reflect.ValueOf(v)
+	if pv.Kind() != reflect.Ptr || pv.IsNil() {
+		return fmt.Errorf("invalid arg reveived: %s", reflect.TypeOf(v))
 	}
-	fmt.Println("byte: " + string(b))
+	return d.parseValue(pv)
+}
+
+func (d *Decoder) parseValue(v reflect.Value) error {
+	d.readNext(v)
+	return nil
+}
+
+func (d *Decoder) readNext(v reflect.Value) (interface{}, error) {
+	b, _ := d.buf.ReadByte()
+	var val interface{}
+	var err error
+
 	if b == 'd' {
-		buf.UnreadByte()
-		item = ReadDict(buf)
+		d.readDict(v)
 	} else if b == 'i' {
-		buf.UnreadByte()
-		item = ReadInt(buf)
+		val, err = d.readInt(v)
 	} else if b == 'l' {
-		buf.UnreadByte()
-		item = ReadList(buf)
+		val, err = d.readList(v)
 	} else {
-		buf.UnreadByte()
-		item = ReadString(buf)
+		d.buf.UnreadByte()
+		val, err = d.readString(v)
 	}
-
-	return item
+	return val, err
 }
 
-func ReadDict(buf *bytes.Buffer) map[string]interface{} {
-	dict := make(map[string]interface{})
-	buf.ReadByte() ////ignore prefix 'd - list'
+func (d *Decoder) readDict(v reflect.Value) error {
 
 	for {
-		key := ReadString(buf)
-		value := ReadNext(buf)
-		dict[key] = value
+		if v.Kind() == reflect.Struct {
+			// key, value
+			// assume key value is a string
+			key, err := d.readKey()
+			field := v.FieldByName(key)
+			// fmt.Printf("field name: %v\n", field)
+			// field.SetInt(10)
 
-		b, err := buf.ReadByte()
-		if err != nil {
-			log.Fatal(err)
-		}
-		if b == 'e' {
-			if infoDictEndPosition == 0 {
-				infoDictEndPosition = (originalBuferLength - buf.Len())
+			// fmt.Printf("key v: %v\n", v)
+			_, err = d.readNext(field)
+			// fmt.Printf("val v: %v\n", v)
+
+			if err != nil {
+				fmt.Println(err)
 			}
-			break
+
+			b, err := d.buf.ReadByte()
+			d.buf.UnreadByte()
+			if err != nil {
+				return err
+			}
+
+			if b == 'e' { // dict end
+				break
+			}
 		} else {
-			buf.UnreadByte() //not end of the dict, unread byte
-		}
-	}
+			// key, value
+			// assume key value is a string
+			key, err := d.readKey()
+			field := v.Elem().FieldByName(key)
+			// fmt.Printf("field name: %v\n", field)
+			// field.SetInt(10)
 
-	return dict
+			// fmt.Printf("key v: %v\n", v)
+			_, err = d.readNext(field)
+			// fmt.Printf("val v: %v\n", v)
+
+			if err != nil {
+				fmt.Println(err)
+			}
+
+			b, err := d.buf.ReadByte()
+			d.buf.UnreadByte()
+			if err != nil {
+				return err
+			}
+
+			if b == 'e' { // dict end
+				break
+			}
+		}
+
+	}
+	return nil
+
 }
 
-func ReadList(buf *bytes.Buffer) []interface{} {
-	var list []interface{}
-	buf.ReadByte() //ignore prefix 'l - list'
-	for {
-		next, err := buf.ReadByte()
-		if err != nil {
-			log.Fatal(err)
-		}
-		if next == 'e' {
-			break
-		}
-
-		buf.UnreadByte() //not end of the list, unread byte
-		value := ReadNext(buf)
-		list = append(list, value)
-	}
-	return list
-}
-
-func ReadInt(buf *bytes.Buffer) int64 {
-	buf.ReadByte() // ignore prefix 'i - integer'
-	stringLine, err := buf.ReadString(byte('e'))
+func (d *Decoder) readKey() (string, error) {
+	strLen, err := d.buf.ReadString(byte(':'))
 	if err != nil {
-		log.Fatal(err)
-	}
-	value, err := strconv.ParseInt(stringLine[0:len(stringLine)-1], 10, 64)
-	if err != nil {
-		log.Fatal(err)
-	}
-	return value
-}
-
-func ReadString(buf *bytes.Buffer) string {
-	strLen, err := buf.ReadString(byte(':'))
-	if err != nil {
-		log.Fatal(err)
+		return "", err
 	}
 	strLenValue, err := strconv.ParseInt(strLen[0:len(strLen)-1], 10, 64)
 	if err != nil {
-		log.Fatal(err)
+		return "", err
 	}
 	buffer := make([]byte, strLenValue)
-	n, err := io.ReadFull(buf, buffer)
+	n, err := io.ReadFull(d.buf, buffer)
 	if err != nil {
-		log.Fatal(err)
+		return "", err
 	}
 	if int64(n) != strLenValue {
-		log.Fatalf("Could not read all bytes. Expected: %d, got: %d\n", strLenValue, n)
+		return "", fmt.Errorf("could not read all bytes. expected: %d, got: %d", strLenValue, n)
 	}
 
-	// we need this to calculate announce hash
-	if string(buffer) == "info" {
-		infoDictStartPosition = originalBuferLength - buf.Len()
+	return string(buffer), nil
+
+}
+
+func (d *Decoder) readList(v reflect.Value) (interface{}, error) {
+
+	v.Set(reflect.Append(v, reflect.ValueOf(make([]interface{}, 0, 0))))
+
+	i := 0
+	for ; ; i++ {
+		b, err := d.buf.ReadByte()
+		if err != nil {
+			return nil, err
+		}
+		if b == 'e' { //end of list
+			break
+		}
+
+		if i == v.Len() {
+			// if i == v.Elem().Len() {
+			// if v.Elem().CanSet() {
+			// v.Elem().Set(reflect.Append(v.Elem(), reflect.ValueOf(make([]interface{}, 0, 0))))
+			// } else {
+			v.Set(reflect.Append(v, reflect.ValueOf(make([]interface{}, 0, 0))))
+			// }
+		}
+
+		d.buf.UnreadByte() //not end, unread one byte
+
+		_, err = d.readNext(v.Index(i))
+
+		if err != nil {
+			return nil, err
+		}
+
+	}
+	return v, nil
+}
+
+func (d *Decoder) readString(v reflect.Value) (interface{}, error) {
+	strLen, err := d.buf.ReadString(byte(':'))
+	if err != nil {
+		return "", err
+	}
+	strLenValue, err := strconv.ParseInt(strLen[0:len(strLen)-1], 10, 64)
+	if err != nil {
+		return "", err
+	}
+	buffer := make([]byte, strLenValue)
+	n, err := io.ReadFull(d.buf, buffer)
+	if err != nil {
+		return "", err
+	}
+	if int64(n) != strLenValue {
+		return "", fmt.Errorf("could not read all bytes. expected: %d, got: %d", strLenValue, n)
+	}
+	fmt.Printf("buffer: %#v\n", buffer)
+	switch v.Kind() {
+	case reflect.String:
+		v.Set(reflect.ValueOf(string(buffer)))
+	default:
+		v.Set(reflect.ValueOf(buffer))
+
 	}
 
-	return string(buffer)
+	return string(buffer), nil
+}
+
+func (d *Decoder) readInt(v reflect.Value) (int64, error) {
+	stringLine, err := d.buf.ReadString(byte('e'))
+	if err != nil {
+		return 0, err
+	}
+	value, err := strconv.ParseInt(stringLine[0:len(stringLine)-1], 10, 64)
+	if err != nil {
+		return 0, err
+	}
+
+	switch v.Kind() {
+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+		v.SetInt(value)
+	case reflect.Interface:
+		v.Set(reflect.ValueOf(v))
+	default:
+		log.Panic("read int")
+	}
+	return value, nil
+}
+
+func printAddress(i interface{}) {
+	fmt.Printf("addr: %p\n", i)
 }
 
 func InfoDictStartPosition() int {
