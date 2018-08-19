@@ -27,8 +27,8 @@ func TestUnmarshal(t *testing.T) {
 	var tr Torrent
 	tr.Announce = "Hi"
 
-	// f, e := ioutil.ReadFile("../ubs_18.torrent.2")
-	f, e := ioutil.ReadFile("../debian.torrent.1")
+	// f, e := ioutil.ReadFile("../ubuntu_18.torrent.custom_field_names")
+	f, e := ioutil.ReadFile("../debian.torrent.custom_field_names")
 	if e != nil {
 		t.Error(e)
 	}
