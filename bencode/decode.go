@@ -40,7 +40,6 @@ func (d *Decode) readNext(v reflect.Value) {
 		fmt.Printf("Error: %v\n", err)
 		log.Panic()
 	}
-
 	switch b {
 	case 'd':
 		d.parseDict(v)
@@ -59,14 +58,11 @@ func (d *Decode) readNext(v reflect.Value) {
 func (d *Decode) parseDict(v reflect.Value) {
 	for {
 		key := d.readKey()
-		// TODO(dplavcic) get field by key == tag getField(key, v)
-
 		var fv reflect.Value
 		if v.Kind() == reflect.Struct {
-			fv = v.FieldByName(key)
+			fv = d.fieldName(v, key)
 		} else {
-			fv = v.Elem().FieldByName(key)
-
+			fv = d.fieldName(v.Elem(), key)
 		}
 
 		// this sets parsed value to v
@@ -116,7 +112,7 @@ func (d *Decode) parseList(v reflect.Value) {
 	for ; ; i++ {
 		switch v.Kind() {
 		case reflect.Slice:
-			v.Set(reflect.Append(v, reflect.MakeSlice(v.Type(), 1, 1)))
+			v.Set(reflect.AppendSlice(v, reflect.MakeSlice(v.Type(), 1, 1)))
 			d.readNext(v.Index(i))
 		case reflect.Interface:
 			// create new slice
@@ -159,4 +155,30 @@ func (d *Decode) parseInt(v reflect.Value) {
 func (d *Decode) parseString(v reflect.Value) {
 	value := d.readKey()
 	v.Set(reflect.ValueOf(value))
+}
+
+func (d *Decode) fieldName(v reflect.Value, key string) reflect.Value {
+
+	val := reflect.Indirect(v)
+	if val.Kind() != reflect.Struct {
+		log.Panic("unmarshall can only take structs")
+	}
+
+	t := val.Type()
+	for i := 0; i < t.NumField(); i++ {
+		f := t.Field(i)
+		tag := fieldName(f)
+		if tag == key {
+			fbi := v.FieldByIndex([]int{i})
+			return fbi
+		}
+	}
+	return reflect.ValueOf("")
+}
+
+func fieldName(f reflect.StructField) string {
+	if t := f.Tag.Get("bencode"); t != "" {
+		return t //return tag
+	}
+	return f.Name //fall back to field name
 }
