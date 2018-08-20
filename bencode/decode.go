@@ -59,13 +59,20 @@ func (d *Decode) parseDict(v reflect.Value) {
 	for {
 		key := d.readKey()
 		var fv reflect.Value
+		var err error
 		if v.Kind() == reflect.Struct {
-			fv = d.fieldName(v, key)
+			fv, err = d.fieldName(v, key)
 		} else {
-			fv = d.fieldName(v.Elem(), key)
+			fv, err = d.fieldName(v.Elem(), key)
+		}
+
+		//ignore unknown fields
+		if err != nil {
+			fmt.Println(err)
 		}
 
 		// this sets parsed value to v
+		fmt.Printf("key: %v, fv: %v\n", key, fv)
 		d.readNext(fv)
 		b, err := d.buf.ReadByte()
 		if err != nil {
@@ -157,7 +164,7 @@ func (d *Decode) parseString(v reflect.Value) {
 	v.Set(reflect.ValueOf(value))
 }
 
-func (d *Decode) fieldName(v reflect.Value, key string) reflect.Value {
+func (d *Decode) fieldName(v reflect.Value, key string) (reflect.Value, error) {
 
 	val := reflect.Indirect(v)
 	if val.Kind() != reflect.Struct {
@@ -170,10 +177,11 @@ func (d *Decode) fieldName(v reflect.Value, key string) reflect.Value {
 		tag := fieldName(f)
 		if tag == key {
 			fbi := v.FieldByIndex([]int{i})
-			return fbi
+			return fbi, nil
 		}
 	}
-	return reflect.ValueOf("")
+
+	return reflect.ValueOf(nil), fmt.Errorf("could not find field tag by key: %v", key)
 }
 
 func fieldName(f reflect.StructField) string {
