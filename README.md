@@ -1,3 +1,5 @@
+CircleCI: [![CircleCI](https://circleci.com/gh/dplavcic/gtorrent/tree/master.svg?style=svg&circle-token=5fa55834376070d68458bad79fe21d5f76cce384)](https://circleci.com/gh/dplavcic/gtorrent/tree/master)
+
 # gTorrent (gTo)
 WIP - Torrent Protocol Specification Implementation
 
