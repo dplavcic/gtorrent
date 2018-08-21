@@ -11,11 +11,11 @@ type Torrent struct {
 	AnnounceList []interface{} `bencode:"announce-list"`
 	Comment      string        `bencode:"comment"`
 	CreationDate int           `bencode:"creation date"`
-	Info         Info          `bencode:"info"`
-	HTTPSeeds    []interface{} `bencode:"http seeds"`
-	Checksum     string        `bencode:"checksum"`
-	CreatedBy    string        `bencode:"created by"`
-	Encoding     string        `bencode:"encoding"`
+	// Info         Info          `bencode:"info"`
+	HTTPSeeds []interface{} `bencode:"http seeds"`
+	Checksum  string        `bencode:"checksum"`
+	CreatedBy string        `bencode:"created by"`
+	Encoding  string        `bencode:"encoding"`
 }
 
 type Info struct {
@@ -27,6 +27,7 @@ type Info struct {
 	Private     int    `bencode:"private"`
 	Entropy     string `bencode:"entropy"`
 	Source      string `bencode:"source"`
+	XCrossSeed  string `bencode:"x cross seed"`
 }
 
 type File struct {
@@ -37,11 +38,11 @@ type File struct {
 
 func TestUnmarshal(t *testing.T) {
 	var tr Torrent
-	f, e := ioutil.ReadFile("../ubuntu_server.torrent")
+	f, e := ioutil.ReadFile("../v.torrent")
 	if e != nil {
 		t.Error(e)
 	}
 
 	Unmarshal(f, &tr)
-	t.Errorf("%v\n\n", tr)
+	t.Errorf("%#v\n\n", tr)
 }
