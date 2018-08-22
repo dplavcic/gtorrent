@@ -57,7 +57,6 @@ func (d *Decode) readNext(v reflect.Value) {
 
 func (d *Decode) parseDict(v reflect.Value) {
 	for {
-		fmt.Println("read next byte")
 		b, err := d.buf.ReadByte()
 		if err != nil {
 			return
@@ -70,7 +69,6 @@ func (d *Decode) parseDict(v reflect.Value) {
 		//not end of dict
 		d.buf.UnreadByte()
 
-		fmt.Println("read key")
 		key := d.readKey()
 		var fv reflect.Value
 		if v.Kind() == reflect.Struct {
@@ -78,19 +76,14 @@ func (d *Decode) parseDict(v reflect.Value) {
 		} else {
 			fv, err = d.fieldName(v.Elem(), key)
 		}
-		fmt.Println("..parseDict")
 
 		//ignore unknown fields
 		if err != nil {
-			fmt.Println(err)
-			fmt.Println("call skipValue")
 			d.skipValue(fv)
-			fmt.Println("call skipValue ended")
 			continue
 		}
 
 		// this sets parsed value to v
-		fmt.Printf("key: %v, fv: %v\n", key, fv)
 		d.readNext(fv)
 	}
 }
@@ -204,7 +197,6 @@ func (d *Decode) skipValue(v reflect.Value) {
 	if err != nil {
 		fmt.Println("could not skip value: ", string(b))
 	}
-	fmt.Println("skip value byte: ", string(b))
 	switch b {
 	case 'd':
 		d.skipDict(v)
@@ -215,45 +207,35 @@ func (d *Decode) skipValue(v reflect.Value) {
 	default:
 		d.buf.UnreadByte()
 		d.skipString(v)
-		fmt.Println("skipped string value")
 	}
 }
 
 func (d *Decode) skipDict(v reflect.Value) {
 	for {
 		//d.readKey()
-		fmt.Println("inside skip dict")
 
 		b, err := d.buf.ReadByte()
-		fmt.Println("inside skip dict: ", string(b))
 		if err != nil {
-			fmt.Println("could not read next byte inside dict")
 			log.Panic()
 		}
 
 		if b == 'e' {
-			fmt.Println("end of skip dict")
 			return //end of dict
 		}
-		fmt.Println("inside skip dict, call skip value")
 		d.buf.UnreadByte()
 		d.skipValue(v)
 	}
 }
 
 func (d *Decode) skipInt(v reflect.Value) {
-	fmt.Println("inside skip int")
-	i, err := d.buf.ReadString(byte('e'))
+	_, err := d.buf.ReadString(byte('e'))
 	if err != nil {
 		log.Fatal(err)
 	}
-	fmt.Println("inside skip int: ", i)
 }
 
 func (d *Decode) skipString(v reflect.Value) {
-	fmt.Println("inside read string")
-	s := d.readKey()
-	fmt.Println("inside read string: ", s)
+	d.readKey()
 }
 
 func (d *Decode) skipList(v reflect.Value) {
@@ -261,7 +243,6 @@ func (d *Decode) skipList(v reflect.Value) {
 		b, err := d.buf.ReadByte()
 		if err != nil {
 			fmt.Println("could not skip list: ", err)
-			fmt.Println("read byte: ", string(b))
 		}
 
 		if b == 'e' {
