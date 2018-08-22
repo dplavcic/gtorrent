@@ -1,7 +1,14 @@
 package bencode
 
 import (
+	"bytes"
+	"crypto"
+	_ "crypto/sha1"
+	"io"
 	"io/ioutil"
+	"log"
+	"net/url"
+	"strings"
 	"testing"
 )
 
@@ -11,11 +18,12 @@ type Torrent struct {
 	AnnounceList []interface{} `bencode:"announce-list"`
 	Comment      string        `bencode:"comment"`
 	CreationDate int           `bencode:"creation date"`
-	// Info         Info          `bencode:"info"`
-	HTTPSeeds []interface{} `bencode:"http seeds"`
-	Checksum  string        `bencode:"checksum"`
-	CreatedBy string        `bencode:"created by"`
-	Encoding  string        `bencode:"encoding"`
+	Info         Info          `bencode:"info"`
+	InfoByte     []byte
+	HTTPSeeds    []interface{} `bencode:"http seeds"`
+	Checksum     string        `bencode:"checksum"`
+	CreatedBy    string        `bencode:"created by"`
+	Encoding     string        `bencode:"encoding"`
 }
 
 type Info struct {
@@ -38,11 +46,38 @@ type File struct {
 
 func TestUnmarshal(t *testing.T) {
 	var tr Torrent
-	f, e := ioutil.ReadFile("../v.torrent")
+	f, e := ioutil.ReadFile("../ubuntu_server.torrent")
 	if e != nil {
 		t.Error(e)
 	}
 
 	Unmarshal(f, &tr)
-	t.Errorf("%#v\n\n", tr)
+	t.Errorf("%v\n", tr)
+}
+
+func TestInfoDictHash(t *testing.T) {
+	var tr Torrent
+	f, e := ioutil.ReadFile("../ubuntu_server.torrent")
+	if e != nil {
+		t.Error(e)
+	}
+
+	Unmarshal(f, &tr)
+	h := calculateSha1(tr.InfoByte)
+
+	got := url.PathEscape(string(h))
+	want := strings.ToUpper("%965%ca%bd%20%1a%92%fd%a5%d6%c7%0d5%cb%fbp~%29%05%89")
+
+	if strings.ToLower(want) != strings.ToLower(got) {
+		t.Errorf("want: %s, got: %s\n", want, got)
+	}
+}
+
+func calculateSha1(b []byte) []byte {
+	buf := bytes.NewBuffer(b)
+	h := crypto.SHA1.New()
+	if _, err := io.Copy(h, buf); err != nil {
+		log.Fatal(err)
+	}
+	return h.Sum(nil)
 }

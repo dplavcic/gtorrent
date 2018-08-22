@@ -11,12 +11,31 @@ import (
 
 type Decode struct {
 	buf *bytes.Buffer
+	// flags used to pare 'info' dict as []byte
+	start    int
+	stop     int
+	original int
+	setStop  bool
 }
 
 func Unmarshal(data []byte, v interface{}) error {
 	buf := bytes.NewBuffer(data)
-	d := Decode{buf: buf}
-	return d.unmarshal(v)
+	d := Decode{buf: buf, original: buf.Len(), setStop: true}
+	r := d.unmarshal(v)
+	// todo(dplavcic) handle this better!!!
+	d.handleInfoDict(v)
+	return r
+}
+
+func (d *Decode) handleInfoDict(v interface{}) {
+	fv, e := d.fieldName(reflect.ValueOf(v).Elem(), "InfoByte")
+	if e != nil {
+		log.Panicf("Could not find field with key: %v, %v", "InfoByte", e)
+	}
+	d.buf.Reset()
+	b := d.buf.Bytes()
+	b1 := b[d.start:d.stop]
+	fv.Set(reflect.ValueOf(b1))
 }
 
 func (d *Decode) unmarshal(v interface{}) (err error) {
@@ -63,6 +82,11 @@ func (d *Decode) parseDict(v reflect.Value) {
 		}
 
 		if b == 'e' { //end of dict
+			if d.setStop {
+				d.stop = d.original - d.buf.Len()
+				d.setStop = false
+			}
+
 			return
 		}
 
@@ -70,6 +94,10 @@ func (d *Decode) parseDict(v reflect.Value) {
 		d.buf.UnreadByte()
 
 		key := d.readKey()
+		if key == "info" {
+			d.start = d.original - d.buf.Len()
+		}
+
 		var fv reflect.Value
 		if v.Kind() == reflect.Struct {
 			fv, err = d.fieldName(v, key)
