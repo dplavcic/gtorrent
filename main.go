@@ -2,7 +2,6 @@ package main
 
 import (
 	_ "crypto/sha1"
-	"fmt"
 	"io/ioutil"
 	"log"
 	"os"
@@ -18,8 +17,14 @@ func main() {
 		log.Fatal(err)
 	}
 
-	fmt.Printf("%#v\n\n", string(data))
-	var tr torrent.TorrentFile
+	var tr torrent.Torrent
 	bencode.Unmarshal(data, &tr)
+
+	var info torrent.Info
+	bencode.Unmarshal(tr.InfoByte, &info)
+	tr.Info = info
+
+	r := torrent.PingTracker(tr)
+	torrent.ParseTrackerResponse(r)
 
 }

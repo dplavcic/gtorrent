@@ -8,7 +8,7 @@ import (
 	"reflect"
 	"strconv"
 )
-q
+
 type Decode struct {
 	buf *bytes.Buffer
 }
@@ -57,7 +57,6 @@ func (d *Decode) readNext(v reflect.Value) {
 }
 
 func (d *Decode) parseDict(v reflect.Value) {
-
 	var i []uint8
 	if v.Kind() == reflect.Slice && v.Type() == reflect.TypeOf(i) {
 		d.buf.UnreadByte()
@@ -316,7 +315,10 @@ func (d *Decode) parseDictByte(v reflect.Value) {
 		rv := reflect.AppendSlice(v, reflect.ValueOf(r))
 		v.Set(rv)
 		d.readNextByte(v)
-		b, _ := d.buf.ReadByte()
+		b, e := d.buf.ReadByte()
+		if e != nil {
+			fmt.Errorf("could not read byte: %v", e)
+		}
 		if b == 'e' {
 			rv = reflect.Append(v, reflect.ValueOf(b))
 			v.Set(rv)
@@ -327,8 +329,14 @@ func (d *Decode) parseDictByte(v reflect.Value) {
 }
 
 func (d *Decode) parseIntByte(v reflect.Value) {
-	i, _ := d.buf.ReadByte()            // i
-	iv, _ := d.buf.ReadBytes(byte('e')) // 3e
+	i, e := d.buf.ReadByte() // i
+	if e != nil {
+		fmt.Errorf("could not read byte: %v", e)
+	}
+	iv, e := d.buf.ReadBytes(byte('e')) // 3e
+	if e != nil {
+		fmt.Errorf("could not read bytes : %v", e)
+	}
 
 	r := make([]byte, 0, 1+len(iv))
 	r = append(r, i)
